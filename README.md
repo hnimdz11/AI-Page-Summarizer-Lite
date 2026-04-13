@@ -6,8 +6,7 @@ Bản rút gọn (Lite) của công cụ tóm tắt trang web bằng AI Gemini, 
 
 - **Giao diện Edge-Design**: Nút bấm trôi nổi (FAB) gắn ở viền phải màn hình, hỗ trợ kéo thả (Draggable) dọc theo mép trang.
 - **Shadow DOM UI**: Đảm bảo giao diện tóm tắt không bị ảnh hưởng bởi CSS/Style của trang web gốc.
-- **Prompt gốc từ Extension**: Tích hợp các mẫu tóm tắt chuyên sâu (Key Takeaways, Main Points, Emojis) từ bản Extension Summaizzerrr.
-- **Hỗ trợ Model mới nhất**: Tùy chọn các dòng Gemini 3.0 Flash, 2.5 Flash, 2.0 Stable.
+- **Hỗ trợ Model mới nhất**: Tùy chọn các dòng Gemini 3.0 Flash, 2.5 Flash.
 - **CORS Bypass**: Sử dụng `GM_xmlhttpRequest` để gọi API xuyên miền mà không bị trình duyệt chặn.
 - **Settings thông minh**: Lưu trữ API Key và cấu hình an toàn qua `GM_setValue`.
 
