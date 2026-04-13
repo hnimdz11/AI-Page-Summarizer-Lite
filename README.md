@@ -12,7 +12,7 @@ Bản rút gọn (Lite) của công cụ tóm tắt trang web bằng AI Gemini, 
 
 ## 🚀 Hướng dấn cài đặt
 
-1. Cài đặt tiện ích [Tampermonkey](https://www.tampermonkey.net/) trên trình duyệt của bạn (Chrome, Edge, Firefox...).
+1. Cài đặt tiện ích [Tampermonkey](https://www.tampermonkey.net/) hoặc [Violentmonkey](https://violentmonkey.github.io/) trên trình duyệt của bạn (Chrome, Edge, Firefox...).
 2. Copy toàn bộ nội dung file `AI_Summarizer_Lite.user.js`.
 3. Mở bảng điều khiển Tampermonkey -> **Add a new script**.
 4. Dán code vào và nhấn **Ctrl+S** để lưu.
