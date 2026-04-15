@@ -3,7 +3,7 @@
 // @namespace    http://tampermonkey.net/
 // @version      2.0
 // @description  Tóm tắt trang web bằng AI Gemini - Bản Lite không mã hóa
-// @author       GG Antigravity
+// @author       Minhdz and GG Antigravity
 // @match        *://*/*
 // @grant        GM_setValue
 // @grant        GM_getValue
@@ -130,7 +130,7 @@ Reply in __LANG__`
 
         /* FAB - Nút bên phải */
         .fab {
-            position: fixed; top: 80%; right: 0;
+            position: fixed; top: 60%; right: 0;
             transform: translateY(-50%);
             width: 44px; height: 52px;
             background: linear-gradient(160deg, #10b981, #3b82f6);
@@ -145,7 +145,7 @@ Reply in __LANG__`
 
         /* Panel chính */
         .panel {
-            position: fixed; top: 80%; right: 58px;
+            position: fixed; top: 60%; right: 58px;
             transform: translateY(-50%);
             width: 360px; max-height: 520px;
             background: #fff; border-radius: 14px;
@@ -349,14 +349,146 @@ Reply in __LANG__`
     }
 
     // ──────────────────────────────────────────────
-    //  EXTRACT TEXT
+    //  EXTRACT TEXT — Site-specific + Generic
     // ──────────────────────────────────────────────
+
+    /** Reddit (new UI) — uses <shreddit-post>, <shreddit-comment> web components */
+    function extractReddit() {
+        const parts = [];
+
+        // Subreddit name
+        const sub = document.querySelector('shreddit-subreddit-header [data-subreddit-name]');
+        if (sub) parts.push(`Subreddit: ${sub.getAttribute('data-subreddit-name')}`);
+
+        // Post title — try multiple selectors
+        const title = document.querySelector('[slot="title"]')
+            || document.querySelector('shreddit-post h1')
+            || document.querySelector('h1[id*="post-title"]')
+            || document.querySelector('[data-post-click-location="title"]');
+        if (title) parts.push(`Title: ${title.textContent.trim()}`);
+
+        // Post body (selftext) — new Reddit puts it in various slots
+        const bodySelectors = [
+            '[slot="text-body"]',
+            '[data-post-click-location="text-body"]',
+            'shreddit-post .md',
+            'shreddit-post [data-click-id="text"]',
+            '.post-content',
+            '#t3_post-rtjson-content',
+        ];
+        for (const sel of bodySelectors) {
+            const bodyEl = document.querySelector(sel);
+            if (bodyEl && bodyEl.textContent.trim().length > 20) {
+                parts.push(`Post Body:\n${bodyEl.textContent.trim()}`);
+                break;
+            }
+        }
+
+        // If it's a link post, grab the outbound URL
+        const linkEl = document.querySelector('shreddit-post a[data-post-click-location="link-button"]')
+            || document.querySelector('shreddit-post a[target="_blank"][href^="http"]');
+        if (linkEl) parts.push(`Link: ${linkEl.href}`);
+
+        // Top comments — grab first 30 for context
+        const commentEls = document.querySelectorAll('shreddit-comment');
+        const commentTexts = [];
+        commentEls.forEach((cEl, i) => {
+            if (i >= 30) return;
+            // Comment body is usually in a <div> with id containing "-comment-rtjson-content"
+            const cBody = cEl.querySelector('[id*="comment-rtjson-content"]')
+                || cEl.querySelector('[slot="comment"]')
+                || cEl.querySelector('.md');
+            if (cBody) {
+                const txt = cBody.textContent.trim();
+                if (txt.length > 5) commentTexts.push(`- ${txt}`);
+            }
+        });
+        if (commentTexts.length) {
+            parts.push(`\nTop Comments (${commentTexts.length}):\n${commentTexts.join('\n')}`);
+        }
+
+        return parts.length > 1 ? parts.join('\n\n') : '';
+    }
+
+    /** Old Reddit (old.reddit.com) */
+    function extractOldReddit() {
+        const parts = [];
+
+        const title = document.querySelector('.top-matter .title a.title');
+        if (title) parts.push(`Title: ${title.textContent.trim()}`);
+
+        const selftext = document.querySelector('.expando .usertext-body .md');
+        if (selftext) parts.push(`Post Body:\n${selftext.textContent.trim()}`);
+
+        const comments = document.querySelectorAll('.comment .md');
+        const commentTexts = [];
+        comments.forEach((c, i) => {
+            if (i >= 30) return;
+            const txt = c.textContent.trim();
+            if (txt.length > 5) commentTexts.push(`- ${txt}`);
+        });
+        if (commentTexts.length) {
+            parts.push(`\nTop Comments (${commentTexts.length}):\n${commentTexts.join('\n')}`);
+        }
+
+        return parts.length > 1 ? parts.join('\n\n') : '';
+    }
+
+    /** Generic extractor — tries multiple content containers */
+    function extractGeneric() {
+        // Priority list of content containers
+        const selectors = [
+            'article',
+            '[role="article"]',
+            'main article',
+            'main',
+            '.post-content',
+            '.entry-content',
+            '.article-body',
+            '#content',
+            '.content',
+        ];
+
+        let el = null;
+        for (const sel of selectors) {
+            const candidate = document.querySelector(sel);
+            if (candidate && candidate.textContent.trim().length > 100) {
+                el = candidate;
+                break;
+            }
+        }
+
+        const clone = (el || document.body).cloneNode(true);
+        // Remove non-content elements
+        clone.querySelectorAll(
+            'script, style, noscript, nav, footer, header, aside, ' +
+            '.sidebar, [role="banner"], [role="navigation"], [role="complementary"], ' +
+            '.ad, .ads, .advertisement, .social-share, .related-posts, ' +
+            '.cookie-banner, .popup, .modal'
+        ).forEach(n => n.remove());
+
+        return (clone.textContent || '').replace(/\s+/g, ' ').trim();
+    }
+
     function extractContent() {
         try {
-            let el = document.querySelector('article') || document.querySelector('main');
-            const clone = (el || document.body).cloneNode(true);
-            clone.querySelectorAll('script, style, nav, footer, header, aside, .sidebar, [role="banner"]').forEach(n => n.remove());
-            let text = (clone.textContent || '').replace(/\s+/g, ' ').trim();
+            const hostname = location.hostname;
+            let text = '';
+
+            // Reddit — new UI
+            if (hostname.includes('reddit.com') && !hostname.startsWith('old.')) {
+                text = extractReddit();
+            }
+            // Reddit — old UI
+            else if (hostname.startsWith('old.reddit.com')) {
+                text = extractOldReddit();
+            }
+
+            // If site-specific extraction failed or returned too little, use generic
+            if (!text || text.length < 50) {
+                text = extractGeneric();
+            }
+
             return text.substring(0, 30000);
         } catch (e) {
             return document.body.innerText.substring(0, 30000);
